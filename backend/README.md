@@ -51,7 +51,7 @@ Este projeto foi idealizado como uma ferramenta de aprendizado, aplicando boas p
 * Express
 * JavaScript
 * TypeScript
-* Prisma ORM
+* Prisma
 * PostgreSQL
 * Docker
 * JWT (autenticação)
