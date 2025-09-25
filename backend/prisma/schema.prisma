@@ -1,0 +1,736 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// ENUMS — Estados e Tipos do Sistema
+//
+enum StatusPedido {
+  SOLICITADO
+  PENDENTE
+  EM_PRODUCAO
+  PRONTO
+  ENTREGUE
+  CANCELADO
+  EXCLUIDO
+}
+
+enum StatusEntrega {
+  PENDENTE
+  EM_TRANSITO
+  ENTREGUE
+  CANCELADA
+}
+
+enum StatusPagamento {
+  PENDENTE
+  APROVADO
+  RECUSADO
+  ESTORNADO
+  CANCELADO
+}
+
+enum TipoOperacao {
+  CRIACAO
+  ATUALIZACAO
+  EXCLUSAO
+  LOGIN
+  LOGOUT
+  LEITURA
+}
+
+enum Prioridade {
+  baixa
+  media
+  alta
+}
+
+enum TipoNotificacao {
+  sistema
+  promocional
+  alerta
+}
+
+enum TipoIntegracao {
+  whatsapp
+  erp
+}
+
+enum TipoFinanceiro {
+  RECEITA
+  DESPESA
+}
+
+enum TipoFidelidade {
+  ACUMULADO
+  RESGATE
+}
+
+enum TipoCampanha {
+  desconto
+  brinde
+  combo
+}
+
+enum StatusCotacao {
+  PENDENTE
+  RESPONDIDA
+  CANCELADA
+}
+
+enum TipoMovimentacao {
+  RECEBIMENTO
+  PAGAMENTO
+}
+
+//
+// ADMINISTRAÇÃO — Auditoria e Usuários
+//
+model Auditoria {
+  id            Int          @id @default(autoincrement())
+  usuario       String
+  funcionarioId Int
+  acao          String
+  entidade      String
+  entidadeId    Int
+  tipoOperacao  TipoOperacao
+  ipOrigem      String
+  dataHora      DateTime     @default(now())
+  ativo         Boolean      @default(true)
+}
+
+model Usuario {
+  id       Int       @id @default(autoincrement())
+  nome     String
+  email    String    @unique
+  senha    String
+  setor    String
+  cargo    String
+  perfil   String
+  ativo    Boolean   @default(true)
+  chamados Chamado[]
+  suportes Suporte[]
+}
+
+//
+// ATENDIMENTO — Clientes e Endereços
+//
+model Cliente {
+  id               Int             @id @default(autoincrement())
+  nomeCompleto     String
+  cpf              String          @unique
+  dataNascimento   DateTime?
+  telefone         String
+  telefoneOpcional String?
+  email            String          @unique
+  observacoes      String?
+  aceitaPromocoes  Boolean
+  aceitaTermos     Boolean
+  ativo            Boolean         @default(true)
+  criadoEm         DateTime        @default(now())
+  enderecoId       Int             @unique
+  endereco         EnderecoEntrega @relation(fields: [enderecoId], references: [id])
+  pedidos          Pedido[]
+  suportes         Suporte[]
+  recebimentos     Recebimento[]   // Relação com recebimentos
+  fidelidades      Fidelidade[]    // Fidelidade acumulada ou resgatada
+}
+
+model EnderecoEntrega {
+  id              Int      @id @default(autoincrement())
+  rua             String
+  numero          String
+  complemento     String?
+  bairro          String
+  cep             String
+  cidade          String
+  pontoReferencia String
+  cliente         Cliente? // Relação reversa com Cliente
+}
+
+//
+// COMPRAS — Fornecedores e Insumos
+//
+model Fornecedor {
+  id                     Int      @id @default(autoincrement())
+  nomeCompleto           String
+  contato                String?
+  nacionalidade          String?
+  estadoCivil            String?
+  cpf                    String   @unique
+  cnpj                   String?  @unique
+  rg                     String   @unique
+  inscricaoEstadual      String?
+  email                  String   @unique
+  telefone               String
+  celular                String?
+  whatsapp               String?
+  telefoneAlternativo    String?
+  pais                   String
+  estado                 String
+  cidade                 String
+  bairro                 String
+  rua                    String
+  numero                 String
+  complemento            String?
+  pontoReferencia        String?
+  observacoes            String?
+  banco                  String
+  agencia                String
+  conta                  String
+  tipoConta              String
+  produtos               String
+  tempoMercado           String?
+  certificacoes          String?
+  capacidadeFornecimento String?
+  atendimento            String?
+  condicoesComerciais    String?
+  historico              String?
+  benchmarking           String?
+  tipoFornecedor         String
+  prazoMedioEntrega      Int?
+  frequenciaEntrega      String?
+  notaQualidade          Int?
+  notaPontualidade       Int?
+  notaAtendimento        Int?
+  aceitaDevolucao        Boolean  @default(false)
+  prazoDevolucao         Int?
+  documentos             Json?
+  ocorrencias            Json?
+  ativo                  Boolean  @default(true)
+  dataCadastro           DateTime @default(now())
+
+  // Relações
+  movimentacoesFinanceiras MovimentacaoFinanceira[]
+  insumos                  Insumo[]
+  comprovantesCompra       ComprovanteCompra[]
+  cotacoes                 Cotacao[]
+}
+
+//
+// INSUMOS — Cadastro e Estoque
+//
+model Insumo {
+  id                Int       @id @default(autoincrement())
+  nome              String
+  categoria         String
+  unidadeMedida     String
+  quantidadeEstoque Float     @default(0)
+  precoCusto        Float?
+  precoUnitario     Float
+  precoFinal        Float?
+  margemLucro       Float?
+  estoqueMinimo     Float?
+  validade          DateTime?
+  ativo             Boolean   @default(true)
+  criadoEm          DateTime  @default(now())
+
+  // Relações
+  fornecedorId    Int?
+  fornecedor      Fornecedor?         @relation(fields: [fornecedorId], references: [id])
+  entradasEstoque EntradaEstoque[]
+  saidas          SaidaInsumo[]
+  insumosPizza    InsumoPizzaPedido[]
+  itensCotacao    ItemCotacao[]
+}
+
+//
+// MOVIMENTAÇÃO DE ESTOQUE
+//
+model EntradaEstoque {
+  id                    Int       @id @default(autoincrement())
+  insumoId              Int
+  centroDeCustoId       Int
+  comprovanteId         Int?
+  quantidadeEntrada     Float
+  valorEntrada          Float
+  dataEntrada           DateTime
+  notaFiscal            String?
+  validade              DateTime?
+  referenciaOperacional String?
+  divergenciaPreco      Boolean?
+  observacoes           String?
+  lote                  String?
+  ativo                 Boolean   @default(true)
+
+  // Relações
+  insumo        Insumo             @relation(fields: [insumoId], references: [id])
+  centroDeCusto CentroDeCusto      @relation(fields: [centroDeCustoId], references: [id])
+  comprovante   ComprovanteCompra? @relation(fields: [comprovanteId], references: [id])
+}
+
+model SaidaInsumo {
+  id         Int      @id @default(autoincrement())
+  insumoId   Int
+  quantidade Float
+  dataSaida  DateTime
+  ativo      Boolean  @default(true)
+
+  // Relação
+  insumo Insumo @relation(fields: [insumoId], references: [id])
+}
+
+//
+// FINANCEIRO — Recebimento de Cliente
+//
+model Recebimento {
+  id               Int      @id @default(autoincrement())
+  clienteId        Int
+  valor            Float
+  formaRecebimento String
+  data             DateTime @default(now())
+  observacoes      String?
+
+  // Relação direta
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+}
+
+//
+// COMPRAS — Comprovantes e Itens
+//
+model ComprovanteCompra {
+  id                        Int      @id @default(autoincrement())
+  numero                    String
+  data                      DateTime
+  valorTotal                Float
+  fornecedorId              Int
+  notaFiscal                String   @unique
+  ativo                     Boolean  @default(true)
+  anexoUrl                  String?
+  integradoComFinanceiro    Boolean?
+  integradoComContabilidade Boolean?
+  observacoes               String?
+
+  // Relações
+  fornecedor      Fornecedor        @relation(fields: [fornecedorId], references: [id])
+  itens           ItemComprovante[]
+  entradasEstoque EntradaEstoque[]
+}
+
+model ItemComprovante {
+  id            Int    @id @default(autoincrement())
+  comprovanteId Int
+  nomeInsumo    String
+  quantidade    Float
+  valorUnitario Float
+
+  // Relação
+  comprovante ComprovanteCompra @relation(fields: [comprovanteId], references: [id])
+}
+
+//
+// FINANCEIRO — Centro de Custo e Movimentações
+//
+model CentroDeCusto {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  descricao String?
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  // Relações
+  entradasEstoque EntradaEstoque[]
+  pedidos         Pedido[]
+}
+
+model Financeiro {
+  id        Int            @id @default(autoincrement())
+  tipo      TipoFinanceiro
+  valor     Float
+  descricao String
+  categoria String?
+  data      DateTime
+  criadoEm  DateTime       @default(now())
+  ativo     Boolean        @default(true)
+}
+
+model MovimentacaoFinanceira {
+  id           Int              @id @default(autoincrement())
+  tipo         TipoMovimentacao
+  valor        Float
+  descricao    String?
+  pedidoId     Int?
+  fornecedorId Int?
+  data         DateTime         @default(now())
+  ativo        Boolean          @default(true)
+
+  // Relações
+  pedido     Pedido?     @relation(fields: [pedidoId], references: [id])
+  fornecedor Fornecedor? @relation(fields: [fornecedorId], references: [id])
+}
+
+//
+// PRODUÇÃO — Pizzas e Pedidos
+//
+model Pizza {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  preco        Float
+  vendas       Int      @default(0)
+  ingredientes String[]
+  tamanho      String
+  tipo         String   @default("salgada")
+  criadaEm     DateTime @default(now())
+  ativo        Boolean  @default(true)
+
+  // Relações
+  pizzaPedidos PizzaPedido[]
+  pedidoItens  PedidoItem[]
+}
+
+model Bebida {
+  id         Int     @id @default(autoincrement())
+  nome       String
+  volume     String
+  tipo       String
+  embalagem  String
+  precoFinal Float
+  ativo      Boolean @default(true)
+
+  // Relações
+  bebidaPedidos BebidaPedido[]  // relação inversa com BebidaPedido
+  pedidoItens   PedidoItem[]    // relação inversa com PedidoItem
+}
+
+model PizzaPedido {
+  id         Int    @id @default(autoincrement())
+  pedidoId   Int
+  pizzaId    Int
+  nome       String
+  precoVenda Float
+  quantidade Int
+
+  // Relações
+  pedido  Pedido              @relation(fields: [pedidoId], references: [id])
+  pizza   Pizza               @relation(fields: [pizzaId], references: [id])
+  insumos InsumoPizzaPedido[]
+}
+
+//
+// PEDIDOS — Pedido, Itens, Pagamento e Comprovantes
+//
+model Pedido {
+  id              Int          @id @default(autoincrement())
+  clienteId       Int
+  centroDeCustoId Int
+  formaPagamento  String
+  observacoes     String?
+  status          StatusPedido @default(PENDENTE)
+  criadoEm        DateTime     @default(now())
+  valorTotal      Float
+  valorFinal      Float?
+  cupomId         Int?
+  campanhaId      Int?
+
+  // Relações
+  cliente                  Cliente                  @relation(fields: [clienteId], references: [id])
+  centroDeCusto            CentroDeCusto            @relation(fields: [centroDeCustoId], references: [id])
+  cupom                    Cupom?                   @relation(fields: [cupomId], references: [id])
+  campanha                 Campanha?                @relation(fields: [campanhaId], references: [id])
+  comprovantes             Comprovante[]
+  pagamentos               Pagamento[]
+  entrega                  Entrega?
+  avaliacoes               Avaliacao[]
+  movimentacoesFinanceiras MovimentacaoFinanceira[]
+  pizzas                   PizzaPedido[]
+  bebidas                  BebidaPedido[]
+  itens                    PedidoItem[]
+}
+
+model PedidoItem {
+  id         Int    @id @default(autoincrement())
+  pedidoId   Int
+  tipo       String // pizza ou bebida
+  pizzaId    Int?
+  bebidaId   Int?
+  quantidade Int
+
+  // Relações
+  pedido Pedido  @relation(fields: [pedidoId], references: [id])
+  pizza  Pizza?  @relation(fields: [pizzaId], references: [id])
+  bebida Bebida? @relation(fields: [bebidaId], references: [id])
+}
+
+model Pagamento {
+  id             Int             @id @default(autoincrement())
+  pedidoId       Int
+  valor          Float
+  formaPagamento String
+  status         StatusPagamento
+  data           DateTime        @default(now())
+  valorPago      Float
+  pagoEm         DateTime        @default(now())
+
+  // Relação
+  pedido Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+model Comprovante {
+  id             Int      @id @default(autoincrement())
+  pedidoId       Int
+  valor          Float
+  formaPagamento String
+  imagemUrl      String?
+  criadoEm       DateTime @default(now())
+  ativo          Boolean  @default(true)
+
+  // Relação
+  pedido Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+//
+// PRODUÇÃO DETALHADA — Insumos e Bebidas por Pedido
+//
+model InsumoPizzaPedido {
+  id                  Int   @id @default(autoincrement())
+  pizzaPedidoId       Int
+  insumoId            Int
+  quantidadeUtilizada Float
+
+  // Relações
+  pizzaPedido PizzaPedido @relation(fields: [pizzaPedidoId], references: [id])
+  insumo      Insumo      @relation(fields: [insumoId], references: [id])
+}
+
+model BebidaPedido {
+  id         Int    @id @default(autoincrement())
+  pedidoId   Int
+  bebidaId   Int
+  nome       String
+  volume     String
+  tipo       String
+  embalagem  String
+  precoFinal Float
+  quantidade Int
+
+  // Relações
+  pedido Pedido @relation(fields: [pedidoId], references: [id])
+  bebida Bebida @relation(fields: [bebidaId], references: [id])
+}
+
+model Produto {
+  id         Int     @id @default(autoincrement())
+  nome       String  @unique // ✅ Adiciona restrição de unicidade
+  preco      Float
+  categoria  String
+  descricao  String?
+  ativo      Boolean @default(true)
+}
+
+// SUPORTE — Chamados e Atendimento ao Cliente
+//
+model Chamado {
+  id           Int        @id @default(autoincrement())
+  titulo       String
+  descricao    String
+  prioridade   Prioridade @default(media)
+  status       String     @default("aberto")
+  resposta     String?
+  usuarioId    Int
+  criadoEm     DateTime   @default(now())
+  atualizadoEm DateTime   @updatedAt
+
+  // Relação
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+model Suporte {
+  id           Int        @id @default(autoincrement())
+  clienteId    Int
+  usuarioId    Int
+  titulo       String
+  assunto      String
+  mensagem     String
+  prioridade   Prioridade @default(media)
+  status       String     @default("aberto")
+  criadoEm     DateTime   @default(now())
+  atualizadoEm DateTime   @updatedAt
+
+  // Relações
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+//
+// CONFIGURAÇÕES DO SISTEMA
+//
+model Configuracao {
+  chave                String  @id
+  valor                String
+  margemLucro          Float?
+  horarioAbertura      String?
+  horarioFechamento    String?
+  taxaEntrega          Float?
+  tempoEstimadoEntrega Int?
+}
+
+model Notificacao {
+  id             Int             @id @default(autoincrement())
+  titulo         String
+  mensagem       String
+  tipo           TipoNotificacao
+  destino        String?
+  agendadaPara   DateTime?
+  criadoEm       DateTime        @default(now())
+  lida           Boolean         @default(false)
+  destinatarioId Int
+}
+
+model Integracao {
+  id       Int            @id @default(autoincrement())
+  tipo     TipoIntegracao
+  destino  String
+  conteudo String
+  criadoEm DateTime       @default(now())
+}
+
+//
+// FIDELIDADE E RECOMPENSAS
+//
+model Fidelidade {
+  id           Int            @id @default(autoincrement())
+  clienteId    Int
+  pontos       Int
+  tipo         TipoFidelidade
+  recompensaId Int?
+  dataRegistro DateTime       @default(now())
+  ativo        Boolean        @default(true)
+
+  // Relações
+  cliente    Cliente     @relation(fields: [clienteId], references: [id])
+  recompensa Recompensa? @relation(fields: [recompensaId], references: [id])
+}
+
+model Recompensa {
+  id          Int     @id @default(autoincrement())
+  nome        String
+  descricao   String?
+  valorMinimo Int
+  ativo       Boolean @default(true)
+
+  // Relação inversa
+  fidelidades Fidelidade[]
+}
+
+//
+// ENTREGA — Logística de pedidos
+//
+model Entrega {
+  id           Int           @id @default(autoincrement())
+  pedidoId     Int           @unique
+  entregadorId Int
+  endereco     String
+  observacoes  String?
+  status       StatusEntrega @default(PENDENTE)
+  dataRegistro DateTime      @default(now())
+  criadoEm     DateTime      @default(now())
+  ativo        Boolean       @default(true)
+
+  // Relações
+  pedido     Pedido     @relation(fields: [pedidoId], references: [id])
+  entregador Entregador @relation(fields: [entregadorId], references: [id])
+}
+
+model Entregador {
+  id       Int     @id @default(autoincrement())
+  nome     String
+  telefone String
+  ativo    Boolean @default(true)
+
+  // Relação inversa
+  entregas Entrega[]
+}
+
+//
+// COTAÇÕES — Solicitações e Itens
+//
+model Cotacao {
+  id              Int           @id @default(autoincrement())
+  fornecedorId    Int
+  prazoEntrega    String?
+  status          StatusCotacao @default(PENDENTE)
+  dataSolicitacao DateTime      @default(now())
+  dataResposta    DateTime?
+  observacoes     String?
+  ativo           Boolean       @default(true)
+  valorFinal      Float?
+
+  // Relações
+  fornecedor Fornecedor    @relation(fields: [fornecedorId], references: [id])
+  itens      ItemCotacao[]
+}
+
+model ItemCotacao {
+  id         Int    @id @default(autoincrement())
+  cotacaoId  Int
+  insumoId   Int
+  quantidade Float
+  preco      Float?
+
+  // Relações
+  cotacao Cotacao @relation(fields: [cotacaoId], references: [id])
+  insumo  Insumo  @relation(fields: [insumoId], references: [id])
+}
+
+//
+// MARKETING E PROMOÇÕES
+//
+model Cupom {
+  id           Int      @id @default(autoincrement())
+  codigo       String   @unique
+  descricao    String?
+  desconto     Float
+  dataValidade DateTime
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+
+  // Relação inversa
+  pedidos Pedido[]
+}
+
+model Campanha {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  titulo     String
+  descricao  String?
+  tipo       String // desconto, combo, etc...
+  percentual Float? // porcentagem de desconto (exemplo: 10 = 10%)
+  valor      Float? // valor fixo de desconto (exemplo: 15.00)
+  dataInicio DateTime
+  dataFim    DateTime
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now())
+
+  // Relação inversa
+  pedidos Pedido[]
+}
+
+model Marketing {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  descricao  String?
+  inicio     DateTime
+  fim        DateTime
+  tipo       String
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now())
+}
+
+//
+// AVALIAÇÕES DE PEDIDOS
+//
+model Avaliacao {
+  id         Int      @id @default(autoincrement())
+  pedidoId   Int
+  nota       Int // 1 a 5
+  comentario String?
+  criadoEm   DateTime @default(now())
+
+  // Relação
+  pedido Pedido @relation(fields: [pedidoId], references: [id])
+}
